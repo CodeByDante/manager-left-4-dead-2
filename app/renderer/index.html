@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>L4D2 Mod Manager</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">L4D<span>2</span></span><div><strong>MOD MANAGER</strong><small>Tu juego. Tus mods.</small></div></div>
+    <div class="installation"><span id="detected" class="pill">SIN CONFIGURAR</span><span id="game-path">Selecciona la carpeta del juego</span></div>
+    <button id="select-game">Elegir juego</button><button id="open-game" class="quiet">Abrir carpeta</button>
+  </header>
+  <div class="workspace">
+    <aside>
+      <span class="nav-caption">BIBLIOTECA</span>
+      <nav aria-label="Secciones">
+        <button data-tab="workshop" class="active">Workshop <span id="count-workshop">0</span></button>
+        <button data-tab="prepared">Mods preparados <span id="count-prepared">0</span></button>
+        <button data-tab="custom">Mods personalizados <span id="count-custom">0</span></button>
+        <span class="nav-caption">HERRAMIENTAS</span>
+        <button data-tab="config">Configuraciones</button>
+        <button data-tab="backups">Copias de seguridad</button>
+      </nav>
+      <div class="sidebar-note"><span class="status-dot"></span>Aplicación de escritorio<small>v1.1 · Windows</small></div>
+    </aside>
+    <main>
+      <div id="notification" role="status" hidden></div>
+      <div class="page-heading"><div><span class="eyebrow">LEFT 4 DEAD 2</span><h1 id="page-title">Workshop</h1><p id="page-description"></p></div><button id="refresh">Actualizar</button></div>
+      <div id="content"></div>
+    </main>
+  </div>
+  <div id="busy" role="status" hidden><div class="busy-card"><span class="spinner"></span><strong id="busy-text">Procesando…</strong><small>Espera a que termine la operación.</small></div></div>
+  <dialog id="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel">Cancelar</button><button id="confirm-ok" class="primary">Continuar</button></div></dialog>
+</body>
+</html>

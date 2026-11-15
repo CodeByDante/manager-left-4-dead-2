@@ -1,47 +1,28 @@
 {
   "name": "l4d2-mod-manager",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "main": "electron/main.cjs",
+  "version": "1.1.0",
+  "description": "Aplicación de escritorio para administrar mods y configuraciones de Left 4 Dead 2",
+  "author": "CodeByDante",
+  "main": "app/main.cjs",
   "scripts": {
-    "dev": "node server/index.js",
+    "start": "electron .",
     "desktop": "electron .",
-    "build": "vite build",
-    "build:exe": "vite build && electron-builder"
+    "check": "node scripts/check.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "build": "npm run check && npm test && electron-builder --win portable --x64",
+    "build:exe": "npm run build"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.l4d2.modmanager",
     "productName": "L4D2 Mod Manager",
-    "directories": {
-      "output": "dist-exe"
-    },
-    "files": [
-      "dist/**/*",
-      "server/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        "portable"
-      ]
-    }
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "lucide-react": "^0.475.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@electron/packager": "^20.3.0",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^44.3.0",
-    "electron-builder": "^26.15.3",
-    "vite": "^6.1.0"
+    "directories": { "output": "release" },
+    "files": ["app/**/*", "package.json"],
+    "asar": true,
+    "win": { "target": ["portable"], "artifactName": "L4D2-Mod-Manager-${version}-${arch}.${ext}" }
   }
 }
