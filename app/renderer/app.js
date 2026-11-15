@@ -1,278 +1,747 @@
-'use strict';
-const api = window.desktop;
-const state = { tab: 'workshop', status: {}, workshop: [], mounted: [], backups: [], selected: new Set(), query: '', sort: 'title', config: 'gameinfo', drafts: {}, configData: {}, launch: null, accountId: '', busy: false };
-const $ = id => document.getElementById(id);
-function el(tag, className, text) {
-  const element = document.createElement(tag);
-  if (className) element.className = className;
-  if (text !== undefined) element.textContent = text;
-  return element;
+const defaultPlaceholder = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='40' viewBox='0 0 64 40'><rect width='64' height='40' fill='%23111116'/><text x='32' y='24' fill='%23555566' font-size='12' text-anchor='middle' font-family='sans-serif'>VPK</text></svg>";
+let realWorkshopMods = [];
+let realGameinfoMods = [];
+async function openLocalFolder(targetPath) {
+  if (!targetPath) return;
+  await window.api.openFileLocation(targetPath);
 }
-function append(parent, ...children) { parent.append(...children.filter(Boolean)); return parent; }
-function button(label, action, style = '') {
-  const node = el('button', style, label);
-  node.type = 'button';
-  node.addEventListener('click', () => Promise.resolve().then(action).catch(error => notify(error.message, true)));
-  return node;
+async function toggleModFile(mod) {
+  await window.api.toggleModStatus({
+    filename: mod.filename,
+    isEnabled: mod.isEnabled
+  });
+  loadModsData();
 }
-function notify(message, error = false) { const node = $('notification'); node.textContent = message; node.classList.toggle('error', error); node.hidden = !message; }
-async function run(label, action) {
-  if (state.busy) return;
-  state.busy = true; $('busy-text').textContent = label; $('busy').hidden = false;
-  try { return await action(); }
-  catch (error) { notify(error.message, true); }
-  finally { state.busy = false; $('busy').hidden = true; }
+function openWorkshopPage(id) {
+  const url = 'https://steamcommunity.com/sharedfiles/filedetails/?id=' + id;
+  window.api.openExternalUrl(url);
 }
-function confirmAction(title, message, okLabel = 'Continuar') {
-  const dialog = $('confirm-dialog');
-  $('confirm-title').textContent = title; $('confirm-message').textContent = message; $('confirm-ok').textContent = okLabel;
-  dialog.showModal();
-  return new Promise(resolve => {
-    let answer = false;
-    $('confirm-ok').onclick = () => { answer = true; dialog.close(); };
-    $('confirm-cancel').onclick = () => dialog.close();
-    dialog.addEventListener('close', () => resolve(answer), { once: true });
+let currentGameinfoData = null;
+function getAvailableWorkshopMods(rawList) {
+  if (!currentGameinfoData) return rawList;
+  const convertedMods = currentGameinfoData.convertedMods || [];
+  const customMods = currentGameinfoData.customMods || [];
+  const activeVersusMods = [...convertedMods, ...customMods];
+  const convertedIds = new Set(activeVersusMods.map(m => m.workshopId || (m.name ? m.name.match(/\d{5,}/)?.[0] : null)).filter(Boolean));
+  return rawList.filter(w => {
+    if (convertedIds.has(w.id)) return false;
+    if (activeVersusMods.some(v => {
+      if (!v) return false;
+      if (v.workshopId && v.workshopId === w.id) return true;
+      if (v.name) {
+        const vLower = v.name.toLowerCase();
+        const wIdLower = (w.id || '').toLowerCase();
+        const wTitleLower = (w.title || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const wFileLower = (w.filename || '').toLowerCase();
+        if (wIdLower && vLower.includes(wIdLower)) return true;
+        if (wFileLower && vLower === wFileLower) return true;
+        if (wTitleLower && vLower.includes(wTitleLower)) return true;
+      }
+      if (v.title && w.title && v.title.trim().toLowerCase() === w.title.trim().toLowerCase()) return true;
+      return false;
+    })) return false;
+    return true;
   });
 }
-function formatSize(size) { return size >= 1024 ** 3 ? (size / 1024 ** 3).toFixed(2) + ' GB' : (size / 1024 ** 2).toFixed(2) + ' MB'; }
-function prepared() { return state.mounted.filter(m => m.kind === 'workshop'); }
-function custom() { return state.mounted.filter(m => m.kind !== 'workshop'); }
-function updateHeader() {
-  $('game-path').textContent = state.status.gamePath || 'Selecciona la carpeta del juego';
-  $('game-path').title = state.status.gamePath || '';
-  $('detected').textContent = state.status.detected ? 'JUEGO DETECTADO' : 'SIN CONFIGURAR';
-  $('detected').classList.toggle('good', state.status.detected);
-  $('count-workshop').textContent = state.workshop.length;
-  $('count-prepared').textContent = prepared().length;
-  $('count-custom').textContent = custom().length;
+async function loadModsData() {
+  try {
+    const result = await window.api.getWorkshopMods();
+    realWorkshopMods = (result.mods || []).map(m => ({
+      id: m.id,
+      title: m.title,
+      desc: m.description || '',
+      img: m.thumbnailUrl || defaultPlaceholder,
+      filename: m.filename,
+      fullPath: m.fullPath,
+      size: m.sizeFormatted,
+      sizeBytes: m.sizeBytes,
+      enabled: m.isEnabled,
+      tags: m.tags || [],
+      requiredItems: m.requiredItems || []
+    }));
+    filterMods();
+    if (currentGameinfoData) renderGameinfo(currentGameinfoData);
+  } catch (error) {
+    realWorkshopMods = [];
+    filterMods();
+    showOperationError(error);
+  }
 }
-async function refresh() {
-  state.status = await api.status();
-  if (state.status.detected) {
-    state.mounted = await api['gameinfo-mods']();
-    const response = await api.workshop();
-    state.workshop = response.mods;
-    if (response.offline) notify('Steam no respondió. Se muestran los archivos locales y los datos disponibles en caché.');
-  } else { state.mounted = []; state.workshop = []; }
-  state.selected.clear();
-  updateHeader();
-  await render();
+function highlightSyntax(text) {
+  if (!text) return '';
+  let escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = escaped.split('\n');
+  const processedLines = lines.map(line => {
+    let inQuote = false;
+    let commentStartIdx = -1;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') {
+        inQuote = !inQuote;
+      } else if (!inQuote) {
+        if (line[i] === '/' && line[i + 1] === '/' || line[i] === '#') {
+          commentStartIdx = i;
+          break;
+        }
+      }
+    }
+    let codePart = commentStartIdx !== -1 ? line.substring(0, commentStartIdx) : line;
+    let commentPart = commentStartIdx !== -1 ? line.substring(commentStartIdx) : '';
+    if (commentPart) {
+      commentPart = `<span class="hl-comment">${commentPart}</span>`;
+    }
+    return codePart + commentPart;
+  });
+  return processedLines.join('\n') + '\n';
 }
-const descriptions = {
-  workshop: ['Workshop', 'Tus VPK descargados de Steam. Actívalos o prepara una copia con prioridad en gameinfo.txt.'],
-  prepared: ['Mods preparados', 'Copias de Workshop registradas en SearchPaths. El archivo original se conserva.'],
-  custom: ['Mods personalizados', 'Carpetas que moviste y registraste manualmente en gameinfo.txt.'],
-  config: ['Configuraciones', 'Edita los archivos del juego y los parámetros de Steam con respaldo automático.'],
-  backups: ['Copias de seguridad', 'Recupera una configuración anterior de esta instalación.']
-};
-async function render() {
-  const [title, description] = descriptions[state.tab];
-  $('page-title').textContent = title; $('page-description').textContent = description;
-  document.querySelectorAll('[data-tab]').forEach(node => node.classList.toggle('active', node.dataset.tab === state.tab));
-  const content = $('content'); content.replaceChildren();
-  if (!state.status.detected && state.tab !== 'backups') {
-    append(content, empty('Selecciona tu juego', 'Elige la carpeta raíz de Left 4 Dead 2. La ruta quedará guardada para la próxima vez.'));
+function onEditorInput(textareaElem, highlightId) {
+  const highlightElem = document.getElementById(highlightId);
+  if (highlightElem && textareaElem) {
+    highlightElem.innerHTML = highlightSyntax(textareaElem.value);
+    highlightElem.scrollTop = textareaElem.scrollTop;
+    highlightElem.scrollLeft = textareaElem.scrollLeft;
+  }
+}
+function onEditorScroll(textareaElem, highlightId) {
+  const highlightElem = document.getElementById(highlightId);
+  if (highlightElem && textareaElem) {
+    highlightElem.scrollTop = textareaElem.scrollTop;
+    highlightElem.scrollLeft = textareaElem.scrollLeft;
+  }
+}
+let currentRawGameinfo = '';
+async function openGameinfoViewer() {
+  if (!currentRawGameinfo) {
+    try {
+      let resData = await window.api.getGameinfoMods();
+      if (resData && resData.rawContent) {
+        currentRawGameinfo = resData.rawContent;
+      }
+    } catch (e) {}
+  }
+  switchTab('editor');
+}
+function closeGameinfoViewer() {
+  switchTab('gameinfo');
+}
+function flashButtonSaved(btnElem) {
+  if (!btnElem) return;
+  const originalHtml = btnElem.getAttribute('data-original-html') || btnElem.innerHTML;
+  if (!btnElem.getAttribute('data-original-html')) {
+    btnElem.setAttribute('data-original-html', originalHtml);
+  }
+  btnElem.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" style="vertical-align: -1px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg><span style="color: #34d399; font-weight: 600;">¡Guardado!</span>`;
+  btnElem.style.borderColor = '#10b981';
+  btnElem.style.background = '#0a1a12';
+  setTimeout(() => {
+    btnElem.innerHTML = originalHtml;
+    btnElem.style.borderColor = '';
+    btnElem.style.background = '';
+  }, 2500);
+}
+async function loadGameinfoData() {
+  try {
+    const data = await window.api.getGameinfoMods();
+    currentRawGameinfo = data.rawContent || '';
+    currentGameinfoData = data;
+    renderGameinfo(data);
+    filterMods();
+  } catch (error) {
+    showOperationError(error);
+  }
+}
+function openExternalLink(url) {
+  window.api.openExternalUrl(url);
+}
+async function translateText(text) {
+  if (!text) return '';
+  try {
+    return await window.api.translateText(text);
+  } catch (e) {
+    return text;
+  }
+}
+const translatedCache = {};
+const iconGlobe = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+const iconPower = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>`;
+const iconFolder = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+const iconExternal = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+async function handleTranslateMod(modId, rawDesc) {
+  const descEl = document.getElementById(`accordion-desc-${modId}`);
+  const btnEl = document.getElementById(`btn-translate-${modId}`);
+  if (!descEl) return;
+  if (translatedCache[modId]) {
+    if (btnEl && btnEl.getAttribute('data-state') === 'translated') {
+      descEl.innerHTML = cleanSteamDescription(rawDesc);
+      btnEl.innerHTML = `${iconGlobe} Traducir a Español`;
+      btnEl.setAttribute('data-state', 'original');
+    } else {
+      descEl.innerHTML = cleanSteamDescription(translatedCache[modId]);
+      if (btnEl) {
+        btnEl.innerHTML = `${iconGlobe} Ver Original`;
+        btnEl.setAttribute('data-state', 'translated');
+      }
+    }
     return;
   }
-  if (state.tab === 'workshop') renderWorkshop(content);
-  if (state.tab === 'prepared' || state.tab === 'custom') renderMounted(content);
-  if (state.tab === 'config') await renderConfig(content);
-  if (state.tab === 'backups') await renderBackups(content);
+  if (btnEl) btnEl.innerHTML = `${iconGlobe} Traduciendo...`;
+  let textToTranslate = rawDesc || '';
+  const translated = await translateText(textToTranslate);
+  translatedCache[modId] = translated;
+  descEl.innerHTML = cleanSteamDescription(translated);
+  if (btnEl) {
+    btnEl.innerHTML = `${iconGlobe} Ver Original`;
+    btnEl.setAttribute('data-state', 'translated');
+  }
 }
-function empty(title, description) { return append(el('div', 'panel empty'), el('strong', '', title), el('p', '', description)); }
-function createTable(headers) {
-  const wrapper = el('div', 'panel table-wrap');
-  const table = el('table'); const head = el('tr');
-  headers.forEach(text => head.append(el('th', '', text)));
-  const body = el('tbody'); append(table, append(el('thead'), head), body); wrapper.append(table);
-  return { wrapper, body, head };
+function toggleAccordionRow(modId, rawDesc) {
+  const mainRow = document.getElementById(`mod-row-${modId}`);
+  const detailRow = document.getElementById(`mod-detail-${modId}`);
+  if (!mainRow || !detailRow) return;
+  const isExpanded = mainRow.classList.contains('expanded');
+  document.querySelectorAll('tr.expanded').forEach(r => {
+    if (r !== mainRow) r.classList.remove('expanded');
+  });
+  document.querySelectorAll('tr.expanded-row').forEach(d => {
+    if (d !== detailRow) d.style.display = 'none';
+  });
+  if (isExpanded) {
+    mainRow.classList.remove('expanded');
+    detailRow.style.display = 'none';
+  } else {
+    mainRow.classList.add('expanded');
+    detailRow.style.display = 'table-row';
+    if (rawDesc && !translatedCache[modId]) {
+      // Translation remains available through its original button.
+    }
+  }
 }
-function filter(items) {
-  const query = state.query.toLocaleLowerCase();
-  return items.filter(m => `${m.title} ${m.id || ''} ${m.name || ''} ${(m.tags || []).join(' ')}`.toLocaleLowerCase().includes(query)).sort((a, b) => state.sort === 'size' ? (b.size || 0) - (a.size || 0) : a.title.localeCompare(b.title));
-}
-function searchToolbar(onChange) {
-  const toolbar = el('div', 'toolbar');
-  const search = el('input'); search.type = 'search'; search.placeholder = 'Buscar por nombre, carpeta o ID…'; search.value = state.query; search.setAttribute('aria-label', 'Buscar mods');
-  const sort = el('select'); sort.setAttribute('aria-label', 'Ordenar mods');
-  for (const [value, label] of [['title', 'Nombre A–Z'], ['size', 'Mayor tamaño']]) { const option = el('option', '', label); option.value = value; sort.append(option); }
-  sort.value = state.sort;
-  search.oninput = () => { state.query = search.value; onChange(); };
-  sort.onchange = () => { state.sort = sort.value; onChange(); };
-  append(toolbar, search, sort); return toolbar;
-}
-function renderWorkshop(content) {
-  const list = el('div');
-  const bulk = button('Preparar seleccionados', async () => {
-    const mods = state.workshop.filter(m => state.selected.has(m.id) && m.enabled && !m.converted);
-    if (!mods.length) return notify('Selecciona al menos un mod activo sin preparar.', true);
-    if (!await confirmAction('Preparar mods', `Se copiarán ${mods.length} VPK y se registrarán en gameinfo.txt. Los originales se conservan. Se creará una copia de la configuración.`, 'Preparar')) return;
-    await run('Preparando mods…', async () => {
-      const failures = []; let complete = 0;
-      for (const [i, mod] of mods.entries()) {
-        $('busy-text').textContent = `Preparando ${i + 1} de ${mods.length}…`;
-        try { await api.convert({ id: mod.id, filename: mod.filename }); complete++; }
-        catch (error) { failures.push(`${mod.title}: ${error.message}`); }
+let currentDialogConfirmCallback = null;
+function showCustomDialog(opts) {
+  document.getElementById('custom-dialog-requirements-container').style.display = '';
+  const modal = document.getElementById('custom-dialog-modal');
+  const titleEl = document.getElementById('custom-dialog-title');
+  const iconWrapper = document.getElementById('custom-dialog-icon-wrapper');
+  const imgEl = document.getElementById('custom-dialog-img');
+  const fallbackIcon = document.getElementById('custom-dialog-fallback-icon');
+  const modTitleEl = document.getElementById('custom-dialog-mod-title');
+  const modIdEl = document.getElementById('custom-dialog-mod-id');
+  const folderEl = document.getElementById('custom-dialog-folder');
+  const messageBox = document.getElementById('custom-dialog-message-box');
+  const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+  const confirmBtn = document.getElementById('custom-dialog-confirm-btn');
+  if (!modal) return;
+  currentDialogConfirmCallback = opts.onConfirm || null;
+  titleEl.innerText = opts.title || 'Notificación';
+  modTitleEl.innerText = opts.modTitle || 'Mod de Left 4 Dead 2';
+  if (opts.modId) {
+    modIdEl.style.display = 'block';
+    modIdEl.innerText = `Workshop ID: ${opts.modId}`;
+  } else {
+    modIdEl.style.display = 'none';
+  }
+  if (opts.folderName) {
+    folderEl.style.display = 'block';
+    folderEl.innerText = `Carpeta VPK: ${opts.folderName}`;
+  } else {
+    folderEl.style.display = 'none';
+  }
+  messageBox.innerText = opts.message || '';
+  if (opts.img) {
+    imgEl.src = opts.img;
+    imgEl.style.display = 'block';
+    fallbackIcon.style.display = 'none';
+  } else {
+    imgEl.style.display = 'none';
+    fallbackIcon.style.display = 'block';
+  }
+  if (opts.type === 'success' || opts.theme === 'green') {
+    iconWrapper.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+    messageBox.style.borderColor = '#1a3a2a';
+    messageBox.style.background = '#0a1a12';
+    messageBox.style.color = '#6ee7b7';
+  } else if (opts.type === 'confirm') {
+    iconWrapper.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+    messageBox.style.borderColor = '#3b1717';
+    messageBox.style.background = '#1a0a0a';
+    messageBox.style.color = '#fca5a5';
+  } else if (opts.type === 'error') {
+    iconWrapper.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+    messageBox.style.borderColor = '#450a0a';
+    messageBox.style.background = '#1c0505';
+    messageBox.style.color = '#fca5a5';
+  } else {
+    iconWrapper.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    messageBox.style.borderColor = '#272730';
+    messageBox.style.background = '#121217';
+    messageBox.style.color = '#d4d4d8';
+  }
+  if (opts.type === 'confirm') {
+    cancelBtn.style.display = 'inline-block';
+    cancelBtn.innerText = opts.cancelText || 'Cancelar';
+    confirmBtn.innerText = opts.confirmText || 'Confirmar';
+    confirmBtn.style.background = opts.confirmBg || '#059669';
+    confirmBtn.style.borderColor = opts.confirmBorder || '#10b981';
+    confirmBtn.style.color = opts.confirmColor || '#ffffff';
+  } else {
+    cancelBtn.style.display = 'none';
+    confirmBtn.innerText = opts.confirmText || 'Entendido';
+    confirmBtn.style.background = '#27272a';
+    confirmBtn.style.borderColor = '#3f3f46';
+    confirmBtn.style.color = '#fff';
+  }
+  const reqListEl = document.getElementById('custom-dialog-req-list');
+  const reqBadgeEl = document.getElementById('custom-dialog-req-badge');
+  if (reqListEl) {
+    reqListEl.innerHTML = '';
+    const requiredItems = opts.requiredItems || [];
+    if (requiredItems.length > 0) {
+      let missingCount = 0;
+      requiredItems.forEach(req => {
+        const isInstalled = req.isInstalled || (currentGameinfoData?.convertedMods || []).some(v => v.workshopId === req.id || v.name && v.name.includes(req.id));
+        if (!isInstalled) missingCount++;
+        const itemEl = document.createElement('div');
+        itemEl.style.cssText = `display: flex; align-items: center; justify-content: space-between; gap: 8px; background: ${isInstalled ? '#08140e' : '#1a0a0a'}; border: 1px solid ${isInstalled ? '#163824' : '#450a0a'}; border-radius: 6px; padding: 6px 10px; font-size: 11px;`;
+        itemEl.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                <span style="color: ${isInstalled ? '#34d399' : '#f87171'}; font-weight: 700;">
+                  ${isInstalled ? '✓' : '⚠️'}
+                </span>
+                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span style="font-weight: 600; color: ${isInstalled ? '#e4e4e7' : '#fca5a5'};">${req.title || 'Mod ' + req.id}</span>
+                  <span style="font-family: monospace; color: #71717a; margin-left: 6px;">(ID: ${req.id})</span>
+                </div>
+              </div>
+              <div>
+                ${isInstalled ? `<span style="font-size: 10px; font-family: monospace; color: #34d399; background: #0c2718; padding: 2px 6px; border-radius: 4px; border: 1px solid #164e2b;">Suscrito</span>` : `<button onclick="event.stopPropagation(); openExternalLink('https://steamcommunity.com/sharedfiles/filedetails/?id=${req.id}')" style="font-size: 10px; font-family: monospace; color: #fca5a5; background: #3b1111; padding: 2px 8px; border-radius: 4px; border: 1px solid #631c1c; cursor: pointer;">Falta suscripción (Abrir en Steam ↗)</button>`}
+              </div>
+            `;
+        reqListEl.appendChild(itemEl);
+      });
+      if (missingCount > 0) {
+        reqBadgeEl.innerText = `FALTAN ${missingCount} SUSCRIPCIÓN(ES)`;
+        reqBadgeEl.style.cssText = 'font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #f87171; background: #261010; border: 1px solid #521c1c;';
+      } else {
+        reqBadgeEl.innerText = 'TODOS INSTALADOS';
+        reqBadgeEl.style.cssText = 'font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #34d399; background: #0c2718; border: 1px solid #164e2b;';
       }
-      await refresh(); notify(`${complete} de ${mods.length} mods preparados.${failures.length ? '\n' + failures.join('\n') : ''}`, failures.length > 0);
-    });
-  }, 'primary');
-  function draw() {
-    list.replaceChildren();
-    const mods = filter(state.workshop);
-    if (!mods.length) { list.append(empty('No hay mods para mostrar', state.workshop.length ? 'Prueba otra búsqueda.' : 'No se encontraron VPK del Workshop en esta instalación.')); return; }
-    const { wrapper, body, head } = createTable(['', 'MOD', 'TAMAÑO', 'ESTADO', 'ACCIONES']);
-    const all = el('input', 'select-check'); all.type = 'checkbox'; all.setAttribute('aria-label', 'Seleccionar todos los mods visibles');
-    const selectable = mods.filter(m => m.enabled && !m.converted);
-    all.checked = selectable.length > 0 && selectable.every(m => state.selected.has(m.id));
-    all.onchange = () => { for (const m of selectable) all.checked ? state.selected.add(m.id) : state.selected.delete(m.id); draw(); };
-    head.firstChild.append(all);
-    for (const mod of mods) {
-      const tr = el('tr'); const check = el('input', 'select-check'); check.type = 'checkbox'; check.checked = state.selected.has(mod.id); check.disabled = !mod.enabled || mod.converted; check.setAttribute('aria-label', `Seleccionar ${mod.title}`);
-      check.onchange = () => { check.checked ? state.selected.add(mod.id) : state.selected.delete(mod.id); all.checked = selectable.length > 0 && selectable.every(m => state.selected.has(m.id)); };
-      const name = el('div', 'mod-name');
-      if (mod.thumbnail) { const image = el('img', 'mod-thumb'); image.src = mod.thumbnail; image.alt = ''; name.append(image); }
-      name.append(append(el('div'), el('strong', '', mod.title), el('small', '', `ID ${mod.id}`)));
-      const actions = el('div', 'row-actions');
-      actions.append(button('Detalles', () => showDetails(mod)));
-      actions.append(button('Carpeta', () => api['open-mod']({ type: 'workshop', filename: mod.filename })));
-      actions.append(button(mod.enabled ? 'Desactivar' : 'Activar', () => run('Cambiando estado…', async () => { await api.toggle({ filename: mod.filename }); await refresh(); })));
-      if (!mod.converted) { const convert = button('Preparar', () => prepareOne(mod), 'primary'); convert.disabled = !mod.enabled; actions.append(convert); }
-      append(tr, append(el('td'), check), append(el('td'), name), el('td', '', formatSize(mod.size)), append(el('td'), el('span', 'badge' + (mod.enabled ? '' : ' off'), mod.converted ? 'Preparado' : mod.enabled ? 'Activo' : 'Desactivado')), append(el('td'), actions)); body.append(tr);
+    } else {
+      reqBadgeEl.innerText = 'NINGUNO REQUERIDO';
+      reqBadgeEl.style.cssText = 'font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #71717a; background: #121217; border: 1px solid #272730;';
+      reqListEl.innerHTML = `<div style="font-size: 11px; color: #71717a; font-family: monospace; background: #08080a; border: 1px solid #18181f; padding: 6px 10px; border-radius: 6px; text-align: center;">✓ Este mod no requiere otros addons adicionales de Steam Workshop.</div>`;
     }
-    wrapper.append(el('div', 'table-footer', `${mods.length} mods · Las copias preparadas no se actualizan automáticamente con Workshop.`)); list.append(wrapper);
   }
-  const toolbar = searchToolbar(draw); toolbar.append(bulk);
-  append(content, el('div', 'hint', 'Preparar registra una copia del VPK como ruta del juego; su compatibilidad depende del mod y del servidor. No transforma sus scripts ni garantiza su funcionamiento en todos los modos.'), toolbar, list); draw();
+  modal.style.display = 'flex';
 }
-async function prepareOne(mod) {
-  if (!await confirmAction('Preparar mod para gameinfo.txt', `Se copiará “${mod.title}” a una carpeta del juego y se añadirá a SearchPaths. El VPK original se conserva y gameinfo.txt tendrá respaldo.`, 'Preparar mod')) return;
-  await run('Preparando mod…', async () => { await api.convert({ id: mod.id, filename: mod.filename }); await refresh(); notify('Mod preparado y registrado correctamente.'); });
+function closeCustomDialog() {
+  const modal = document.getElementById('custom-dialog-modal');
+  if (modal) modal.style.display = 'none';
+  currentDialogConfirmCallback = null;
 }
-async function showDetails(mod) {
-  const dialog = el('dialog');
-  const description = el('div', 'detail-text', mod.description || 'Sin descripción disponible.');
-  const requirements = el('div', 'requirements', 'Consultando requisitos en Steam…');
-  const actions = el('div', 'detail-actions');
-  append(actions, button('Abrir Workshop', () => api.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.id}`)), button('Traducir descripción', () => run('Traduciendo…', async () => { description.textContent = await api.translate(mod.description || ''); })));
-  append(dialog, el('h2', '', mod.title), el('p', '', `Workshop ${mod.id} · ${formatSize(mod.size)}`), description, actions, requirements, append(el('div', 'dialog-actions'), button('Cerrar', () => dialog.close())));
-  document.body.append(dialog); dialog.addEventListener('close', () => dialog.remove(), { once: true }); dialog.showModal();
+function onCustomDialogConfirm() {
+  const cb = currentDialogConfirmCallback;
+  closeCustomDialog();
+  if (cb) Promise.resolve().then(cb).catch(showOperationError);
+}
+function convertWorkshopModToVersus(mod) {
+  showCustomDialog({
+    type: 'confirm',
+    theme: 'green',
+    title: '¿Convertir Mod a Versus VPK?',
+    modTitle: mod.title,
+    modId: mod.id,
+    folderName: mod.filename,
+    img: mod.img || mod.thumbnailUrl,
+    requiredItems: mod.requiredItems || [],
+    message: `¿Deseas convertir "${mod.title}" a Versus VPK (pak01_dir.vpk)?`,
+    cancelText: 'Cancelar',
+    confirmText: 'Confirmar',
+    confirmBg: '#059669',
+    confirmBorder: '#10b981',
+    confirmColor: '#ffffff',
+    onConfirm: async () => {
+      await executeConvertWorkshopModToVersus(mod);
+    }
+  });
+}
+async function executeConvertWorkshopModToVersus(mod) {
   try {
-    const result = await api.requirements(mod.id);
-    if (!requirements.isConnected) return;
-    requirements.replaceChildren(el('strong', '', 'Requisitos del Workshop'));
-    if (!result.verified) requirements.append(el('p', '', 'No se pudo verificar la lista en Steam. Revisa la página del mod.'));
-    else if (!result.items.length) requirements.append(el('p', '', 'Steam no indica requisitos adicionales.'));
-    const installed = new Set([...state.workshop.map(m => m.id), ...state.mounted.map(m => m.id)]);
-    for (const id of result.items) requirements.append(button(`${installed.has(id) ? 'Instalado' : 'No encontrado'} · ID ${id} ↗`, () => api.external(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`), 'quiet'));
-  } catch (error) { requirements.textContent = error.message; }
-}
-function renderMounted(content) {
-  const list = el('div');
-  const items = state.tab === 'custom' ? custom() : prepared();
-  function draw() {
-    list.replaceChildren();
-    const mods = filter(items);
-    if (!mods.length) { list.append(empty('No hay carpetas registradas', state.tab === 'custom' ? 'Aquí aparecen las rutas personalizadas de SearchPaths, tal como las registraste en gameinfo.txt.' : 'Prepara un mod desde Workshop para verlo aquí.')); return; }
-    const { wrapper, body, head } = createTable(['', 'MOD / CARPETA', 'ARCHIVOS', 'GESTIÓN', 'ACCIONES']);
-    const all = el('input', 'select-check'); all.type = 'checkbox'; all.setAttribute('aria-label', 'Seleccionar todas las rutas visibles');
-    all.checked = mods.length > 0 && mods.every(m => state.selected.has(m.name));
-    all.onchange = () => { for (const m of mods) all.checked ? state.selected.add(m.name) : state.selected.delete(m.name); draw(); };
-    head.firstChild.append(all);
-    for (const mod of mods) {
-      const name = append(el('div', 'mod-name'), append(el('div'), el('strong', '', mod.title), el('small', '', mod.name)));
-      const actions = append(el('div', 'row-actions'), button('Carpeta', () => api['open-mod']({ type: 'mounted', name: mod.name })), button(mod.managed ? 'Retirar mod' : 'Quitar registro', () => removeOne(mod), 'danger'));
-      const check = el('input', 'select-check'); check.type = 'checkbox'; check.checked = state.selected.has(mod.name); check.setAttribute('aria-label', `Seleccionar ${mod.title}`);
-      check.onchange = () => { check.checked ? state.selected.add(mod.name) : state.selected.delete(mod.name); all.checked = mods.every(m => state.selected.has(m.name)); };
-      append(body, append(el('tr'), append(el('td'), check), append(el('td'), name), append(el('td'), el('span', 'badge' + (mod.exists ? '' : ' off'), mod.exists ? 'Carpeta encontrada' : 'No encontrada')), el('td', '', mod.managed ? 'Aplicación' : 'Manual'), append(el('td'), actions)));
-    }
-    list.append(wrapper);
-  }
-  if (state.tab === 'custom') content.append(el('div', 'hint', 'Esta sección lee las carpetas personalizadas que ya figuran en gameinfo.txt. “Quitar registro” elimina su entrada; conserva los archivos que moviste manualmente.'));
-  const toolbar = searchToolbar(draw);
-  toolbar.append(button('Retirar seleccionados', async () => {
-    const mods = items.filter(m => state.selected.has(m.name));
-    if (!mods.length) return notify('Selecciona al menos una ruta.', true);
-    const managed = mods.filter(m => m.managed).length;
-    if (!await confirmAction('Retirar registros seleccionados', `Se quitarán ${mods.length} registros de gameinfo.txt. Las carpetas manuales se conservarán.${managed ? ` Las ${managed} carpetas creadas por esta aplicación se enviarán a la Papelera.` : ''}`, 'Retirar seleccionados')) return;
-    await run('Retirando registros…', async () => {
-      const errors = []; let complete = 0;
-      for (const mod of mods) { try { await api.remove({ name: mod.name }); complete++; } catch (error) { errors.push(`${mod.title}: ${error.message}`); } }
-      await refresh(); notify(`${complete} de ${mods.length} registros retirados.${errors.length ? '\n' + errors.join('\n') : ''}`, errors.length > 0);
+    let res;
+    res = await window.api.convertWorkshopModToVersus({
+      id: mod.id,
+      title: mod.title,
+      filename: mod.filename,
+      fullPath: mod.fullPath
     });
-  }, 'danger'));
-  append(content, toolbar, list); draw();
+    if (res && res.success) {
+      closeCustomDialog();
+      loadModsData();
+      loadGameinfoData();
+    } else {
+      showCustomDialog({
+        type: 'error',
+        title: 'Error al Convertir Mod',
+        modTitle: mod.title,
+        modId: mod.id,
+        img: mod.img || mod.thumbnailUrl,
+        message: 'Error al convertir el mod: ' + (res?.error || 'Desconocido')
+      });
+    }
+  } catch (err) {
+    showCustomDialog({
+      type: 'error',
+      title: 'Error al Convertir Mod',
+      modTitle: mod.title,
+      modId: mod.id,
+      img: mod.img || mod.thumbnailUrl,
+      message: 'Error al convertir el mod: ' + err.message
+    });
+  }
 }
-async function removeOne(mod) {
-  const detail = mod.managed ? 'Su carpeta creada por esta aplicación se enviará a la Papelera de Windows y se quitará el registro.' : 'Se quitará su entrada de gameinfo.txt. La carpeta y tus archivos se conservarán.';
-  if (!await confirmAction('Retirar mod', `“${mod.title}”\n\n${detail}\nSe respaldará gameinfo.txt.`, mod.managed ? 'Retirar mod' : 'Quitar registro')) return;
-  await run('Retirando mod…', async () => { await api.remove({ name: mod.name }); await refresh(); notify('Registro retirado. Puedes recuperar gameinfo.txt desde Copias de seguridad.'); });
+function handleChkCellClickWorkshop(tdElem, e) {
+  if (e) e.stopPropagation();
+  const chk = tdElem ? tdElem.querySelector('.chk-mod-workshop') : null;
+  if (chk) {
+    if (e && e.target !== chk) {
+      chk.checked = !chk.checked;
+    }
+    updateWorkshopSelectionCount();
+  }
 }
-async function renderConfig(content) {
-  const tabs = el('div', 'config-tabs');
-  for (const [key, label] of [['gameinfo', 'gameinfo.txt'], ['autoexec', 'autoexec.cfg'], ['addonconfig', 'addonconfig.cfg'], ['launch', 'Inicio de Steam']]) tabs.append(button(label, () => run('Cargando configuración…', async () => { state.config = key; await render(); }), state.config === key ? 'active' : ''));
-  content.append(tabs);
-  if (state.config === 'launch') return renderLaunch(content);
-  const kind = state.config;
-  const data = await api['read-config'](kind);
-  state.configData[kind] = data;
-  if (state.tab !== 'config' || state.config !== kind) return;
-  const panel = el('div', 'panel');
-  const textarea = el('textarea', 'editor'); textarea.spellcheck = false; textarea.setAttribute('aria-label', `Editor de ${kind}`); textarea.value = state.drafts[kind] ?? data.content;
-  const dirty = el('span', '', state.drafts[kind] !== undefined ? 'Sin guardar' : 'Sin cambios');
-  textarea.oninput = () => { state.drafts[kind] = textarea.value; dirty.textContent = textarea.value === data.content ? 'Sin cambios' : 'Sin guardar'; };
-  textarea.onkeydown = event => { if (event.key === 'Tab') { event.preventDefault(); textarea.setRangeText('\t', textarea.selectionStart, textarea.selectionEnd, 'end'); textarea.dispatchEvent(new Event('input')); } };
-  const save = button('Guardar cambios', () => run('Guardando configuración…', async () => {
-    await api['save-config']({ kind, content: textarea.value }); delete state.drafts[kind];
-    if (kind === 'gameinfo') { state.mounted = await api['gameinfo-mods'](); updateHeader(); }
-    await render(); notify('Configuración guardada. Si existía una versión anterior, se creó su respaldo.');
-  }), 'primary');
-  append(panel, append(el('div', 'editor-toolbar'), dirty, save), el('div', 'editor-path', data.file), textarea, el('div', 'editor-note', 'Cierra el juego antes de cambiar su configuración. Tus borradores se conservan al cambiar de sección; se descartan al cerrar la aplicación.'));
-  content.append(panel);
+function handleChkCellClickGameinfo(tdElem, e) {
+  if (e) e.stopPropagation();
+  const chk = tdElem ? tdElem.querySelector('.chk-mod-gameinfo') : null;
+  if (chk) {
+    if (e && e.target !== chk) {
+      chk.checked = !chk.checked;
+    }
+    updateGameinfoSelectionCount();
+  }
 }
-async function renderLaunch(content) {
-  const data = await api.launch({ accountId: state.accountId }); state.launch = data; state.accountId = data.id || '';
-  if (state.tab !== 'config' || state.config !== 'launch') return;
-  const panel = el('div', 'panel panel-body');
-  const top = el('div', 'toolbar');
-  const select = el('select'); select.setAttribute('aria-label', 'Cuenta de Steam');
-  for (const account of data.accounts) { const option = el('option', '', `Cuenta ${account.id}`); option.value = account.id; select.append(option); }
-  select.value = state.accountId;
-  select.onchange = () => run('Cambiando cuenta…', async () => { state.accountId = select.value; await render(); });
-  append(top, select, button('Elegir carpeta de Steam', () => run('Seleccionando Steam…', async () => { if (await api['select-steam']()) { state.accountId = ''; await render(); } })));
-  panel.append(top);
-  if (!data.accounts.length) { append(panel, el('p', '', 'Selecciona la carpeta de Steam. La cuenta debe haber ejecutado Left 4 Dead 2 al menos una vez.')); content.append(panel); return; }
-  append(panel, el('p', '', 'Cierra Steam antes de guardar para evitar que sobrescriba los cambios. Elige la cuenta que deseas modificar.'));
-  const key = `launch-${state.accountId}`;
-  const input = el('input', 'launch-input'); input.setAttribute('aria-label', 'Parámetros de inicio de Steam'); input.value = state.drafts[key] ?? data.launchOptions;
-  input.oninput = () => { state.drafts[key] = input.value; };
-  panel.append(input);
-  const presets = el('div', 'presets');
-  for (const [flag, label] of [['-novid', 'Omitir intro'], ['-console', 'Consola'], ['-nojoy', 'Sin joystick'], ['-windowed', 'Ventana'], ['-noborder', 'Sin bordes']]) presets.append(button(label, () => {
-    const tokens = input.value.trim().split(/\s+/).filter(Boolean); input.value = tokens.includes(flag) ? tokens.filter(t => t !== flag).join(' ') : [...tokens, flag].join(' '); input.dispatchEvent(new Event('input'));
-  }));
-  append(panel, presets, button('Guardar parámetros', () => run('Guardando parámetros…', async () => { await api['save-launch']({ accountId: state.accountId, content: input.value }); delete state.drafts[key]; notify('Parámetros guardados con copia de seguridad.'); }), 'primary'));
-  content.append(panel);
+let isQuickSelectWorkshop = false;
+let isQuickSelectGameinfo = false;
+function toggleQuickSelectWorkshop() {
+  isQuickSelectWorkshop = !isQuickSelectWorkshop;
+  const icon = document.getElementById('icon-quick-select-workshop');
+  if (icon) {
+    icon.innerHTML = isQuickSelectWorkshop ? '<path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' : '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>';
+  }
+  const bulkBtn = document.getElementById('btn-bulk-convert');
+  if (bulkBtn) {
+    bulkBtn.style.display = isQuickSelectWorkshop ? 'inline-flex' : 'none';
+  }
+  filterMods();
+  updateWorkshopSelectionCount();
 }
-async function renderBackups(content) {
-  const backups = await api.backups();
-  if (state.tab !== 'backups') return;
-  content.append(append(el('div', 'toolbar'), button('Abrir carpeta de copias', () => api['open-backups']())));
-  content.append(el('div', 'hint', 'Restaurar recupera el archivo de configuración. Si retiraste un mod, recupera también su carpeta desde la Papelera de Windows.'));
-  if (!backups.length) { content.append(empty('Todavía no hay copias', 'Se crean automáticamente antes de modificar un archivo existente.')); return; }
-  const { wrapper, body } = createTable(['FECHA', 'ARCHIVO', 'ACCIÓN']);
-  for (const item of backups) body.append(append(el('tr'), el('td', '', new Date(item.createdAt).toLocaleString('es-PE')), el('td', 'backup-file', item.file), append(el('td'), button('Restaurar', async () => {
-    if (!await confirmAction('Restaurar configuración', `Se recuperará la versión del ${new Date(item.createdAt).toLocaleString('es-PE')}. Se respaldará la versión actual. Cierra Steam y el juego antes de continuar.`, 'Restaurar')) return;
-    await run('Restaurando…', async () => { await api.restore({ id: item.id }); state.drafts = {}; await refresh(); notify('Configuración restaurada.'); });
-  }))));
-  content.append(wrapper);
+function toggleSelectAllWorkshop(checked) {
+  document.querySelectorAll('.chk-mod-workshop').forEach(c => {
+    c.checked = checked;
+  });
+  updateWorkshopSelectionCount();
 }
-$('select-game').onclick = async () => {
-  if (Object.keys(state.drafts).length && !await confirmAction('Cambiar de instalación', 'Los borradores sin guardar se descartarán al elegir otra instalación.')) return;
-  await run('Seleccionando juego…', async () => { if (await api['select-game']()) { state.drafts = {}; state.accountId = ''; await refresh(); } });
-};
-$('open-game').onclick = () => run('Abriendo carpeta…', () => api['open-game']());
-$('refresh').onclick = () => run('Actualizando biblioteca…', refresh);
-for (const node of document.querySelectorAll('[data-tab]')) node.onclick = () => run('Cargando sección…', async () => { state.tab = node.dataset.tab; state.query = ''; state.selected.clear(); await render(); });
-if (!api) { notify('Abre el proyecto con npm start o ejecuta la aplicación de Windows.', true); }
-else run('Leyendo tu instalación…', refresh);
+function updateWorkshopSelectionCount() {
+  const selected = document.querySelectorAll('.chk-mod-workshop:checked');
+  const count = selected.length;
+  const txt = document.getElementById('bulk-convert-text');
+  if (txt) txt.innerText = `Convertir (${count})`;
+}
+function toggleQuickSelectGameinfo() {
+  isQuickSelectGameinfo = !isQuickSelectGameinfo;
+  const icon = document.getElementById('icon-quick-select-gameinfo');
+  if (icon) {
+    icon.innerHTML = isQuickSelectGameinfo ? '<path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' : '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>';
+  }
+  const bulkBtn = document.getElementById('btn-bulk-delete-gameinfo');
+  if (bulkBtn) {
+    bulkBtn.style.display = isQuickSelectGameinfo ? 'inline-flex' : 'none';
+  }
+  if (currentGameinfoData) renderGameinfo(currentGameinfoData);
+  updateGameinfoSelectionCount();
+}
+function toggleSelectAllGameinfo(checked) {
+  document.querySelectorAll('.chk-mod-gameinfo').forEach(c => {
+    c.checked = checked;
+  });
+  updateGameinfoSelectionCount();
+}
+function updateGameinfoSelectionCount() {
+  const selected = document.querySelectorAll('.chk-mod-gameinfo:checked');
+  const count = selected.length;
+  const txt = document.getElementById('bulk-delete-text-gameinfo');
+  if (txt) txt.innerText = `(${count})`;
+}
+let gameinfoSortField = 'title';
+let gameinfoSortOrder = 'asc';
+function cycleSortFieldGameinfo() {
+  if (gameinfoSortField === 'title') gameinfoSortField = 'size';else if (gameinfoSortField === 'size') gameinfoSortField = 'id';else gameinfoSortField = 'title';
+  const textEl = document.getElementById('sort-field-text-gameinfo');
+  if (textEl) {
+    textEl.innerText = gameinfoSortField === 'title' ? 'Nombre' : gameinfoSortField === 'size' ? 'Tamaño' : 'ID';
+  }
+  if (currentGameinfoData) renderGameinfo(currentGameinfoData);
+}
+function toggleSortOrderGameinfo() {
+  gameinfoSortOrder = gameinfoSortOrder === 'asc' ? 'desc' : 'asc';
+  const textEl = document.getElementById('sort-order-text-gameinfo');
+  const iconEl = document.getElementById('sort-order-icon-gameinfo');
+  if (textEl) textEl.innerText = gameinfoSortOrder.toUpperCase();
+  if (iconEl) {
+    iconEl.innerHTML = gameinfoSortOrder === 'asc' ? '<line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline>' : '<line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline>';
+  }
+  if (currentGameinfoData) renderGameinfo(currentGameinfoData);
+}
+function filterGameinfoMods() {
+  if (currentGameinfoData) renderGameinfo(currentGameinfoData);
+}
+let currentSortField = 'title';
+let currentSortOrder = 'asc';
+function cycleSortField() {
+  if (currentSortField === 'title') currentSortField = 'size';else if (currentSortField === 'size') currentSortField = 'id';else currentSortField = 'title';
+  const fieldText = document.getElementById('sort-field-text');
+  if (fieldText) {
+    fieldText.innerText = currentSortField === 'title' ? 'Nombre' : currentSortField === 'size' ? 'Tamaño' : 'ID';
+  }
+  filterMods();
+}
+function toggleSortOrder() {
+  currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+  const orderText = document.getElementById('sort-order-text');
+  const orderIcon = document.getElementById('sort-order-icon');
+  if (orderText) orderText.innerText = currentSortOrder.toUpperCase();
+  if (orderIcon) {
+    orderIcon.innerHTML = currentSortOrder === 'asc' ? '<line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline>' : '<line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline>';
+  }
+  filterMods();
+}
+function setSortFromHeader(field) {
+  if (currentSortField === field) {
+    toggleSortOrder();
+  } else {
+    currentSortField = field;
+    const fieldText = document.getElementById('sort-field-text');
+    if (fieldText) {
+      fieldText.innerText = field === 'title' ? 'Nombre' : field === 'size' ? 'Tamaño' : 'ID';
+    }
+    filterMods();
+  }
+}
+function parseSizeBytes(sizeStr) {
+  if (!sizeStr) return 0;
+  const match = sizeStr.match(/([\d.]+)\s*(MB|GB|KB|B)/i);
+  if (!match) return 0;
+  const num = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  if (unit === 'GB') return num * 1024 * 1024 * 1024;
+  if (unit === 'MB') return num * 1024 * 1024;
+  if (unit === 'KB') return num * 1024;
+  return num;
+}
+function filterMods() {
+  const searchElem = document.getElementById('search-box');
+  const query = (searchElem ? searchElem.value : '').toLowerCase().trim();
+  const rawDataset = realWorkshopMods;
+  const dataset = getAvailableWorkshopMods(rawDataset);
+  const filtered = dataset.filter(m => !query || m.id.toLowerCase().includes(query) || m.title.toLowerCase().includes(query) || m.desc && m.desc.toLowerCase().includes(query) || m.tags && m.tags.some(t => t.toLowerCase().includes(query)));
+  filtered.sort((a, b) => {
+    let valA, valB;
+    if (currentSortField === 'title') {
+      valA = (a.title || '').toLowerCase();
+      valB = (b.title || '').toLowerCase();
+      return currentSortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    } else if (currentSortField === 'size') {
+      valA = a.sizeBytes !== undefined ? a.sizeBytes : parseSizeBytes(a.size);
+      valB = b.sizeBytes !== undefined ? b.sizeBytes : parseSizeBytes(b.size);
+      return currentSortOrder === 'asc' ? valA - valB : valB - valA;
+    } else if (currentSortField === 'id') {
+      valA = (a.id || '').toLowerCase();
+      valB = (b.id || '').toLowerCase();
+      return currentSortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    }
+    return 0;
+  });
+  renderMods(filtered);
+}
+let currentRawAutoexec = '';
+async function loadAutoexecData() {
+  try {
+    let resData = null;
+    resData = await window.api.getAutoexecCfg();
+    if (resData && resData.rawContent !== undefined) {
+      currentRawAutoexec = resData.rawContent;
+      const el = document.getElementById('autoexec-page-textarea');
+      if (el) {
+        el.value = currentRawAutoexec;
+        onEditorInput(el, 'autoexec-page-highlight');
+      }
+    }
+  } catch (err) {
+    console.error('Error loading autoexec.cfg:', err);
+  }
+}
+let currentRawAddonconfig = '';
+async function loadAddonconfigData() {
+  try {
+    let resData = null;
+    resData = await window.api.getAddonconfigCfg();
+    if (resData && resData.rawContent !== undefined) {
+      currentRawAddonconfig = resData.rawContent;
+      const el = document.getElementById('addonconfig-page-textarea');
+      if (el) {
+        el.value = currentRawAddonconfig;
+        onEditorInput(el, 'addonconfig-page-highlight');
+      }
+    }
+  } catch (err) {
+    console.error('Error loading addonconfig.cfg:', err);
+  }
+}
+let currentRawLaunchOptions = '';
+let currentLaunchOptionsPath = '';
+async function loadLaunchOptionsData() {
+  try {
+    let resData = null;
+    resData = await window.api.getLaunchOptions();
+    if (resData) {
+      currentRawLaunchOptions = resData.launchOptions || '';
+      currentLaunchOptionsPath = resData.vdfPath || 'C:\\Program Files (x86)\\Steam\\userdata';
+      const pathEl = document.getElementById('launch-options-path');
+      if (pathEl) pathEl.innerText = currentLaunchOptionsPath;
+      const textareaEl = document.getElementById('launch-options-textarea');
+      if (textareaEl) {
+        textareaEl.value = currentRawLaunchOptions;
+        onEditorInput(textareaEl, 'launch-options-highlight');
+        renderLaunchTags();
+      }
+    }
+  } catch (err) {
+    console.error('Error loading launch options:', err);
+  }
+}
+async function saveLaunchOptionsContent(btnElem) {
+  const content = document.getElementById('launch-options-textarea').value;
+  let res = null;
+  res = await window.api.saveLaunchOptions(content);
+  if (res && res.success) {
+    currentRawLaunchOptions = content;
+    if (btnElem) flashButtonSaved(btnElem);
+  } else {
+    alert('Error al guardar Parámetros de Inicio: ' + (res && res.error || 'Desconocido'));
+  }
+}
+const PRESET_LIBRARY = [{
+  flag: '-novid',
+  label: 'Omitir Intro'
+}, {
+  flag: '-console',
+  label: 'Consola'
+}, {
+  flag: '-high',
+  label: 'Prioridad Alta CPU'
+}, {
+  flag: '-nojoy',
+  label: 'Sin Joystick'
+}, {
+  flag: '-lv',
+  label: 'Sangre Reducida (Low Violence)'
+}, {
+  flag: '-insecure',
+  label: 'Modo Inseguro / Mods VPK'
+}, {
+  flag: '-useallavailablecores',
+  label: 'Todos Núcleos CPU'
+}, {
+  flag: '-windowed -noborder',
+  label: 'Ventana Sin Bordes'
+}];
+function renderPresetLibrary(currentRawText) {
+  const libContainer = document.getElementById('preset-library-container');
+  if (!libContainer) return;
+  const availablePresets = PRESET_LIBRARY.filter(item => {
+    const flags = item.flag.split(/\s+/);
+    return !flags.every(f => currentRawText.includes(f));
+  });
+  if (availablePresets.length === 0) {
+    libContainer.innerHTML = `<span style="font-size: 11px; color: #52525b;" class="font-mono">Todos los parámetros populares ya han sido añadidos.</span>`;
+  } else {
+    libContainer.innerHTML = availablePresets.map(item => `
+          <button class="preset-chip" onclick="toggleLaunchFlag('${item.flag}')"><code>${item.flag}</code> ${item.label}</button>
+        `).join('');
+  }
+}
+function removeLaunchTag(tag) {
+  const textareaEl = document.getElementById('launch-options-textarea');
+  if (!textareaEl) return;
+  let val = textareaEl.value;
+  val = val.replace(tag, '').replace(/\s+/g, ' ').trim();
+  textareaEl.value = val;
+  onEditorInput(textareaEl, 'launch-options-highlight');
+  renderLaunchTags();
+}
+function toggleLaunchFlag(flag) {
+  const textareaEl = document.getElementById('launch-options-textarea');
+  if (!textareaEl) return;
+  let val = textareaEl.value;
+  if (val.includes(flag)) {
+    val = val.replace(flag, '').replace(/\s+/g, ' ').trim();
+  } else {
+    val = (val.trim() + ' ' + flag).trim();
+  }
+  textareaEl.value = val;
+  onEditorInput(textareaEl, 'launch-options-highlight');
+  renderLaunchTags();
+}
+function switchTab(tab) {
+  document.getElementById('tab-workshop')?.classList.toggle('active', tab === 'workshop');
+  document.getElementById('tab-gameinfo')?.classList.toggle('active', tab === 'gameinfo');
+  document.getElementById('tab-editor')?.classList.toggle('active', tab === 'editor');
+  document.getElementById('tab-autoexec')?.classList.toggle('active', tab === 'autoexec');
+  document.getElementById('tab-addonconfig')?.classList.toggle('active', tab === 'addonconfig');
+  document.getElementById('section-workshop').style.display = tab === 'workshop' ? 'block' : 'none';
+  document.getElementById('section-gameinfo').style.display = tab === 'gameinfo' ? 'block' : 'none';
+  document.getElementById('section-editor').style.display = tab === 'editor' ? 'block' : 'none';
+  document.getElementById('section-autoexec').style.display = tab === 'autoexec' ? 'block' : 'none';
+  document.getElementById('section-addonconfig').style.display = tab === 'addonconfig' ? 'block' : 'none';
+  if (tab === 'gameinfo') {
+    loadGameinfoData();
+  } else if (tab === 'editor') {
+    const el = document.getElementById('gameinfo-page-textarea');
+    if (el) {
+      if (!currentRawGameinfo) {
+        window.api.getGameinfoMods().then(res => {
+          if (res && res.rawContent) currentRawGameinfo = res.rawContent;
+          el.value = currentRawGameinfo || '';
+          onEditorInput(el, 'gameinfo-page-highlight');
+        }).catch(() => {
+          el.value = currentRawGameinfo || '';
+          onEditorInput(el, 'gameinfo-page-highlight');
+        });
+      } else {
+        el.value = currentRawGameinfo || '';
+        onEditorInput(el, 'gameinfo-page-highlight');
+      }
+    }
+  } else if (tab === 'autoexec') {
+    const el = document.getElementById('autoexec-page-textarea');
+    if (el) {
+      el.value = currentRawAutoexec || '';
+      onEditorInput(el, 'autoexec-page-highlight');
+    }
+  } else if (tab === 'addonconfig') {
+    const el = document.getElementById('addonconfig-page-textarea');
+    if (el) {
+      el.value = currentRawAddonconfig || '';
+      onEditorInput(el, 'addonconfig-page-highlight');
+    }
+  }
+}
+let currentSelectedMod = null;
+function openModal(mod) {
+  currentSelectedMod = mod;
+  document.getElementById('modal-title').innerText = mod.title;
+  document.getElementById('modal-sub').innerText = `ID: ${mod.id} • ${mod.size} • ${mod.filename}`;
+  document.getElementById('modal-img').src = mod.img;
+  document.getElementById('modal-desc').innerText = mod.desc;
+  document.getElementById('mod-modal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('mod-modal').style.display = 'none';
+}

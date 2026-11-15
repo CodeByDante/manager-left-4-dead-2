@@ -1,155 +1,168 @@
 <p align="center">
-  <img src="app/assets/logo.png" width="130" alt="Logo de L4D2 Mod Manager">
+  <img src="app/assets/logo.png" width="220" alt="Logo de L4D2 Mod Manager">
 </p>
 
 <h1 align="center">L4D2 Mod Manager</h1>
 
-<p align="center"><strong>Tus mods y configuraciones de Left 4 Dead 2, en una aplicación de escritorio.</strong></p>
+<p align="center">Administra tus mods y configuraciones de Left 4 Dead 2 desde una aplicación de PC.</p>
 
-Aplicación de escritorio para Windows que administra mods y configuraciones de **Left 4 Dead 2**. Electron abre la interfaz incluida en el proyecto directamente. No utiliza servidor local, navegador externo, Express, Vite ni React.
+<p align="center">
+  <a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.1/L4D2-Mod-Manager-1.1.1-x64.exe">
+    <img src="docs/images/download-windows.svg" width="440" alt="DESCARGAR L4D2 MOD MANAGER">
+  </a>
+</p>
 
-## Descargar para Windows
+<p align="center">Windows de 64 bits · Portable · No requiere Node.js para utilizar el ejecutable</p>
+<p align="center"><a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases">Ver versiones y archivos en Releases</a></p>
 
-**[Descargar L4D2 Mod Manager v1.1.0 portable (.exe)](https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.0/L4D2-Mod-Manager-1.1.0-x64.exe)**
+## Tu interfaz original
 
-Windows de 64 bits · Abre el ejecutable directamente · No requiere Node.js.
+Se conserva el diseño del proyecto original: fondo oscuro, pestañas superiores **Workshop Mods**, **Versus VPK**, **Autoexec** y **AddonConfig**, portadas grandes, tabla, etiquetas y botones de iconos. El logo propio se utiliza en el icono de la aplicación y en esta documentación.
 
-[Ver la versión y sus archivos en Releases](https://github.com/CodeByDante/manager-left-4-dead-2/releases/tag/v1.1.0) · [Comprobación SHA-256](https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.0/SHA256SUMS.txt)
+![Workshop Mods con el diseño original](docs/images/workshop.png)
 
-![Vista general de la aplicación](docs/images/workshop.png)
-
-> Las imágenes muestran la interfaz real ejecutada con datos ilustrativos para explicar su uso. Los nombres, IDs, rutas y copias visibles son ejemplos; no son una prueba de compatibilidad de esos mods con el juego. La aplicación distribuida solo lista tus archivos reales.
-
-## Guía visual de uso
-
-### 1. Detectar la instalación
-
-Al abrir la aplicación se busca Steam en el registro de Windows y se consultan sus bibliotecas. A partir de la instalación encontrada se resuelven las rutas de Workshop, `gameinfo.txt` y los archivos de `cfg`. No necesitas seleccionar cada ruta por separado.
-
-Si usas otra instalación o no se detecta, pulsa **Elegir juego** y selecciona la carpeta raíz que contiene `left4dead2\gameinfo.txt`. La elección se conserva para las próximas sesiones. **Abrir carpeta** muestra esa ubicación en Windows.
-
-### 2. Revisar y preparar mods del Workshop
-
-![Workshop: búsqueda, estado y preparación](docs/images/workshop.png)
-
-1. Busca un mod por nombre o ID, o cambia el orden de la lista.
-2. Abre **Detalles** para leer la descripción y consultar los requisitos publicados en Steam.
-3. Usa **Activar / Desactivar** para cambiar el estado del VPK original.
-4. Pulsa **Preparar**, o selecciona varios y usa **Preparar seleccionados**.
-5. Confirma la operación. La aplicación crea una carpeta `Workshop_<ID>`, copia el VPK y agrega su ruta a `gameinfo.txt`, con copia de seguridad de la configuración.
-
-No mueve ni borra el VPK original del Workshop. Si un paquete está dividido en segmentos, verifica y copia los segmentos que necesita. Los resultados de operaciones por lotes indican cuántos mods se prepararon y qué errores ocurrieron.
-
-### 3. Administrar los mods preparados
-
-![Mods preparados y carpetas registradas](docs/images/prepared.png)
-
-Aquí aparecen los mods preparados desde Workshop. Puedes abrir su **Carpeta**, comprobar si existe y retirar uno o varios registros.
-
-Al usar **Retirar mod** en una carpeta creada por esta versión, se envía a la Papelera de Windows y se quita su registro de `gameinfo.txt`. Las carpetas de versiones antiguas que no se identifican como creadas por esta versión se conservan al quitar el registro.
-
-### 4. Revisar tus mods personalizados
-
-![Mods personalizados registrados manualmente](docs/images/custom.png)
-
-Esta sección conserva la función original: **lee las carpetas que la persona movió y registró manualmente en `SearchPaths` de `gameinfo.txt`**. No importa ni inventa mods.
-
-- **Carpeta encontrada / No encontrada:** indica si se localizó el directorio de esa ruta dentro de la instalación.
-- **Carpeta:** abre la ubicación detectada.
-- **Quitar registro:** elimina la entrada de `gameinfo.txt` y conserva los archivos que moviste manualmente.
-- **Retirar seleccionados:** permite quitar varios registros con confirmación previa; las carpetas manuales se conservan.
-
-### 5. Editar configuraciones y parámetros de inicio
-
-![Editor de gameinfo.txt y archivos de configuración](docs/images/config.png)
-
-En **Configuraciones**, elige el archivo, edítalo y pulsa **Guardar cambios**:
-
-| Pestaña | Para qué sirve |
-| --- | --- |
-| `gameinfo.txt` | Revisar y editar las rutas de búsqueda que carga el juego |
-| `autoexec.cfg` | Guardar tus comandos y ajustes personales de inicio |
-| `addonconfig.cfg` | Editar la configuración de addons que utiliza el juego |
-| **Inicio de Steam** | Elegir la cuenta y editar los parámetros de lanzamiento de L4D2 |
-
-Los cambios a `gameinfo.txt` se validan antes de guardar. Cada archivo existente se respalda antes de reemplazarlo. Los borradores se conservan al cambiar de sección durante la sesión.
-
-Para los parámetros de lanzamiento se usa el bloque de la aplicación **550 (L4D2)** de la cuenta seleccionada; los bloques de otros juegos se conservan. Cierra el juego antes de modificar su configuración y cierra Steam antes de guardar sus parámetros.
-
-### 6. Recuperar una configuración anterior
-
-![Copias de seguridad y restauración de archivos](docs/images/backups.png)
-
-En **Copias de seguridad**, elige la fecha y el archivo y pulsa **Restaurar**. La aplicación respalda primero la versión actual. También puedes abrir la carpeta donde se guardan las copias.
-
-Restaurar una configuración no recupera por sí solo una carpeta de mod retirada: si corresponde, restaura también esa carpeta desde la Papelera de Windows.
+> Capturas de la interfaz real ejecutada con datos ilustrativos para documentar su uso. Las rutas y configuraciones visibles son ejemplos. Los mods y sus portadas pertenecen a sus respectivos autores; su aparición aquí no certifica compatibilidad con todos los modos o servidores. El ejecutable solo lista los archivos presentes en la instalación seleccionada.
 
 ## Qué hace
 
-- Detecta Steam desde el registro de Windows y sus ubicaciones habituales; busca L4D2 en las bibliotecas de `libraryfolders.vdf`.
-- Permite seleccionar otra instalación y recuerda la ruta.
-- Lista los VPK del Workshop realmente presentes en disco, con búsqueda, orden, estado y detalles de Steam.
-- Activa/desactiva los VPK cambiando su extensión entre `.vpk` y `.vpk.disabled`.
-- **Prepara mods de Workshop**: copia el VPK a `Workshop_<ID>/pak01_dir.vpk` y registra esa carpeta en `SearchPaths` de `gameinfo.txt`. Conserva el original y admite archivos VPK divididos si sus segmentos están presentes junto al directorio.
-- **Mods personalizados**: muestra las carpetas que el usuario movió y registró manualmente en `gameinfo.txt`. Se conserva este funcionamiento; no se añadió un importador de mods ni datos de demostración. Quitar un registro manual conserva su carpeta.
-- Edita `gameinfo.txt`, `autoexec.cfg`, `addonconfig.cfg` y los parámetros de inicio de Steam para la cuenta seleccionada.
-- Crea copias de configuraciones existentes antes de modificarlas y permite restaurarlas.
-- Envía a la Papelera las carpetas creadas por esta versión al retirar sus mods. Las carpetas manuales y las creadas por versiones antiguas se conservan al quitar su registro.
+La herramienta automatiza tareas de archivos y configuración que normalmente se realizan a mano:
 
-Preparar un mod no reescribe su contenido ni garantiza compatibilidad con todos los modos o servidores. Las copias preparadas son independientes de las actualizaciones de Workshop. Los requisitos se consultan al abrir los detalles; una consulta fallida se indica como no verificada.
+- Detecta Steam y busca L4D2 en sus bibliotecas.
+- Lee los VPK locales del Workshop y consulta sus datos en Steam.
+- Prepara una copia de los VPK en una carpeta propia y registra esa ruta en `SearchPaths` de `gameinfo.txt`.
+- Conserva el VPK original. Comprueba y copia los segmentos cuando el VPK está dividido.
+- Muestra las carpetas de mods que moviste y registraste manualmente.
+- Permite editar `gameinfo.txt`, `autoexec.cfg` y `addonconfig.cfg`.
+- Respalda las configuraciones antes de modificarlas y permite restaurarlas.
 
-## Ejecutar el proyecto
+El proyecto se ejecuta directamente con Electron. No utiliza servidor local, Express, Vite, React ni un navegador externo.
 
-Requiere Windows y Node.js LTS (22 o superior).
+## 1. Abrir la aplicación y detectar las rutas
+
+Descarga el `.exe` desde el botón de arriba y ábrelo. No necesitas instalar Node.js ni ejecutar comandos para usar el portable.
+
+Steam se busca en el registro de Windows y en sus ubicaciones habituales. El juego se busca en las bibliotecas de `libraryfolders.vdf`. Desde la instalación elegida se calculan automáticamente las rutas de Workshop y las configuraciones.
+
+Si no se detecta el juego, se abre el selector de carpetas. Selecciona la carpeta raíz que contiene `left4dead2\gameinfo.txt`. La elección se guarda para las siguientes sesiones.
+
+Para cambiar de instalación, pulsa **Ctrl+O**. Para actualizar la biblioteca, pulsa **Ctrl+R**. El menú de herramientas se muestra con **Alt**.
+
+## 2. Workshop Mods
+
+![Lista de VPK del Workshop](docs/images/workshop.png)
+
+| Control | Función |
+| --- | --- |
+| Buscar mod por título o ID | Filtra los archivos encontrados |
+| Nombre / Tamaño / ID | Cambia el criterio de ordenación |
+| ASC / DESC | Cambia el sentido del orden |
+| Flecha junto al mod | Prepara una copia para registrarla en `gameinfo.txt` |
+| Carpeta | Abre la ubicación del VPK en Windows |
+| Enlace externo | Abre la página del mod en Steam Workshop |
+| Fila del mod | Despliega la descripción, etiquetas y acciones adicionales |
+| Selección Rápida | Activa la selección múltiple y el botón de conversión por lotes |
+
+Para preparar un mod, pulsa la **flecha** y confirma. La aplicación crea `Workshop_<ID>`, copia el archivo como `pak01_dir.vpk` y añade la carpeta a `SearchPaths`. Antes de modificar `gameinfo.txt`, crea su respaldo.
+
+Los requisitos se consultan al abrir la confirmación individual. Si Steam no responde, se indica que no pudieron verificarse. Desde la descripción desplegada puedes traducir el texto o activar/desactivar el VPK original.
+
+Preparar un mod no transforma sus scripts ni garantiza compatibilidad con todos los modos o servidores. Las copias preparadas son independientes de las actualizaciones del Workshop.
+
+## 3. Versus VPK y mods personalizados
+
+![Versus VPK y carpetas añadidas manualmente](docs/images/gameinfo.png)
+
+La tabla superior muestra las carpetas de los mods preparados. Puedes abrir su ubicación, visitar su página de Steam y retirar sus registros.
+
+La tabla inferior **Mods Añadidos Manualmente** conserva el funcionamiento original: muestra las carpetas que el usuario movió y registró por su cuenta en `gameinfo.txt`. No es un importador de mods ni muestra datos de demostración.
+
+| Tipo de carpeta | Qué ocurre al retirar su registro |
+| --- | --- |
+| Movida manualmente por el usuario | Se quita la entrada de `gameinfo.txt`; se conserva la carpeta |
+| Creada por esta versión de la aplicación | Se respalda la configuración y se envía la carpeta a la Papelera de Windows |
+| Preparada por una versión antigua, sin identificación de esta versión | Se conserva la carpeta al quitar su registro |
+
+El indicador de disco muestra si se encontró la carpeta. Para editar el archivo completo, pulsa **gameinfo.txt** en la barra de Versus VPK.
+
+## 4. Editar gameinfo.txt
+
+![Editor original de gameinfo.txt](docs/images/config.png)
+
+1. Abre **Versus VPK → gameinfo.txt**.
+2. Revisa o edita el contenido.
+3. Pulsa **Guardar Cambios**.
+4. Usa **Volver a Versus VPK** para regresar a las tablas.
+
+La estructura de `SearchPaths` se valida antes de guardar. Si existe una versión anterior, se crea su copia de seguridad. Cierra el juego antes de modificar sus archivos.
+
+## 5. Autoexec
+
+![Editor original de autoexec.cfg](docs/images/autoexec.png)
+
+En **Autoexec**, edita tus comandos y ajustes personales y pulsa **Guardar Cambios**. Si `autoexec.cfg` todavía no existe, se crea en la carpeta `left4dead2\cfg` de la instalación seleccionada.
+
+## 6. AddonConfig
+
+![Editor original de addonconfig.cfg](docs/images/addonconfig.png)
+
+En **AddonConfig**, revisa o modifica la configuración de addons que utiliza el juego. Pulsa **Guardar Cambios** para escribir el archivo con respaldo previo de su versión existente.
+
+## Copias de seguridad
+
+Las copias se guardan en los datos de usuario de la aplicación, separadas del código y del ejecutable.
+
+- Pulsa **Alt → Herramientas → Abrir copias de seguridad** para verlas.
+- Pulsa **Ctrl+Shift+B**, o **Herramientas → Restaurar una copia**, para seleccionar un archivo `.bak` y confirmar su recuperación.
+- Antes de restaurar se respalda también la configuración actual.
+- Solo se aceptan copias correspondientes a la instalación seleccionada.
+
+Restaurar `gameinfo.txt` no recupera por sí solo una carpeta retirada: si corresponde, restaura también esa carpeta desde la Papelera de Windows. Cierra el juego y Steam antes de recuperar configuraciones.
+
+## Ejecutar el código fuente
+
+Esta sección es para desarrollar el proyecto. El usuario del `.exe` no necesita estos pasos.
+
+Requiere Windows y Node.js LTS 22 o superior.
 
 ```cmd
 npm ci
 npm start
 ```
 
-También puedes abrir `abrir_app_escritorio.bat` desde la carpeta del proyecto. El archivo instala las dependencias si no encuentra Electron.
+También puedes abrir `abrir_app_escritorio.bat` desde la carpeta del proyecto.
 
-## Crear el ejecutable para PC
+## Construir el portable
 
 ```cmd
 npm run build
 ```
 
-El portable queda en `release\L4D2-Mod-Manager-1.1.0-x64.exe`. El usuario final puede abrir el `.exe` sin instalar Node.js ni ejecutar comandos.
+El resultado queda en `release\L4D2-Mod-Manager-1.1.1-x64.exe`.
 
-GitHub Actions dispone del flujo **Windows desktop**: instala las dependencias con el archivo de bloqueo, comprueba el código, ejecuta las pruebas y construye el portable en Windows. El ejecutable se descarga desde el artefacto `L4D2-Mod-Manager-Windows` de una ejecución correcta.
+El flujo **Windows desktop** de GitHub Actions instala las dependencias, verifica el código, ejecuta las pruebas y construye el ejecutable en Windows. Las versiones publicadas se encuentran en [Releases](https://github.com/CodeByDante/manager-left-4-dead-2/releases).
 
-## Uso
+## Organización del proyecto
 
-1. Abre la aplicación. Si detecta la instalación, carga sus rutas automáticamente. Si no, pulsa **Elegir juego** y selecciona la carpeta que contiene `left4dead2\gameinfo.txt`.
-2. En **Workshop**, abre los detalles para revisar requisitos. Activa el mod antes de prepararlo; puedes preparar varios seleccionados.
-3. En **Mods preparados**, revisa las copias registradas por la herramienta. En **Mods personalizados**, revisa las rutas agregadas manualmente.
-4. En **Configuraciones**, edita y guarda. Para los parámetros de inicio, cierra Steam primero y selecciona la cuenta correcta. Cierra también el juego antes de modificar sus archivos.
-5. En **Copias de seguridad**, restaura la configuración anterior cuando lo necesites. Si retiraste una carpeta de mod, recupera también esa carpeta desde la Papelera de Windows.
-
-Los borradores de los editores se conservan al cambiar de sección durante la sesión. Se descartan al cerrar la aplicación o cambiar de instalación.
-
-## Carpetas
-
-| Ruta | Función |
+| Ruta | Contenido |
 | --- | --- |
-| `app/main.cjs` | Ventana de escritorio, diálogos nativos y comunicación con el sistema |
-| `app/preload.cjs` | Operaciones permitidas para la interfaz |
-| `app/services/manager.cjs` | Gestión de mods, rutas, configuraciones y copias |
-| `app/services/files.cjs` | Lectura KeyValues de Valve, VPK y escrituras con respaldo |
-| `app/services/steam.cjs` | Detección de Steam, bibliotecas, cuentas y metadatos del Workshop |
-| `app/renderer/` | Interfaz, estilos y acciones; archivos locales sin compilación web |
-| `tests/` | Pruebas con instalaciones y configuraciones temporales |
-| `scripts/check.cjs` | Verificación de sintaxis y ausencia de servidor local |
-| `.github/workflows/windows.yml` | Construcción del ejecutable en Windows |
+| `app/main.cjs` | Ventana de PC, diálogos y menú nativo |
+| `app/preload.cjs` | Comunicación limitada entre la interfaz y Electron |
+| `app/renderer/index.html` y `styles.css` | Estructura y estilo de la interfaz original |
+| `app/renderer/app.js` | Controles originales de pestañas, búsqueda, orden y editores |
+| `app/renderer/original-controls.js` | Renderizado seguro de datos y acciones corregidas |
+| `app/renderer/bridge.js` | Conexión de los controles originales con las operaciones de escritorio |
+| `app/services/` | Archivos del juego, mods, rutas, configuraciones, Steam y copias |
+| `app/assets/` | Logo, icono y tipografías locales con sus licencias |
+| `docs/images/` | Capturas y botón de descarga del README |
+| `tests/` | Pruebas con archivos temporales, sin alterar tu instalación |
 
-Las preferencias, la caché y las copias se guardan en el directorio de datos de usuario de la aplicación, fuera del código y del ejecutable. No se guardan tokens de GitHub. Workshop y traducción requieren conexión; la gestión de archivos y configuraciones funciona con los archivos locales.
+Las tipografías se incluyen localmente para conservar el diseño sin descargarlas al iniciar. Workshop y traducción requieren conexión; la gestión de configuraciones utiliza los archivos locales.
 
-## Verificar cambios
+## Verificar el proyecto
 
 ```cmd
 npm run check
 npm test
 ```
 
-Las pruebas usan carpetas temporales: no alteran tu instalación de Steam ni el juego. Comprueban lectura de rutas manuales, conservación de originales, preparación y recuperación, rechazo de rutas ajenas, límites de bloques KeyValues y selección de cuentas.
+Las pruebas comprueban las rutas manuales, la conservación de originales, la preparación de VPK y sus segmentos, la recuperación de configuraciones, el manejo de errores y los límites de los bloques KeyValues de Valve.

@@ -71,7 +71,7 @@ class Manager {
     const mods = files.map(filename => {
       const id = filename.match(/^\d+/)[0];
       const file = path.join(dir, filename);
-      return { id, filename, ...cache[id], title: cache[id]?.title || `Mod ${id}`, description: cache[id]?.description || '', size: fs.statSync(file).size, enabled: !filename.endsWith('.disabled'), converted: converted.has(id), thumbnail: this.thumbnail(path.join(dir, `${id}.jpg`)) };
+      return { id, filename, fullPath: file, ...cache[id], title: cache[id]?.title || `Mod ${id}`, description: cache[id]?.description || '', size: fs.statSync(file).size, enabled: !filename.endsWith('.disabled'), converted: converted.has(id), thumbnail: this.thumbnail(path.join(dir, `${id}.jpg`)) };
     });
     return { mods, offline };
   }

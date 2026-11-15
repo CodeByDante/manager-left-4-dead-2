@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { Manager } = require('./services/manager.cjs');
@@ -46,6 +46,24 @@ else {
     handle('restore', data => manager.restore(data), true);
     handle('launch', data => manager.launch(data));
     handle('save-launch', data => manager.saveLaunch(data), true);
+    handle('open-location', async location => {
+      const fs = require('node:fs');
+      const known = { game: manager.root, workshop: manager.workshopDir, gameinfo: manager.configPath('gameinfo'), autoexec: manager.configPath('autoexec'), addonconfig: manager.configPath('addonconfig') };
+      let file;
+      if (location && typeof location === 'object') file = known[location.kind];
+      else if (typeof location === 'string') {
+        const normalized = path.resolve(location);
+        const candidates = [...Object.values(known), ...manager.gameinfoMods().map(m => m.folder).filter(Boolean)];
+        file = candidates.find(p => path.resolve(p) === normalized);
+        if (!file && path.dirname(normalized) === path.resolve(manager.workshopDir)) {
+          const filename = path.basename(normalized);
+          file = manager.modLocation({ type: 'workshop', filename });
+        }
+      }
+      if (!file || !fs.existsSync(file)) throw new Error('No se encontró esta ubicación en la instalación seleccionada.');
+      if (fs.statSync(file).isDirectory()) { const error = await shell.openPath(file); if (error) throw new Error(error); }
+      else shell.showItemInFolder(file);
+    });
     handle('open-mod', async data => {
       const file = manager.modLocation(data);
       if (data.type === 'workshop') shell.showItemInFolder(file);
@@ -61,6 +79,28 @@ else {
     window = new BrowserWindow({ width: 1320, height: 880, minWidth: 960, minHeight: 640, backgroundColor: '#0b0d12', autoHideMenuBar: true, title: 'L4D2 Mod Manager', icon: path.join(__dirname, 'assets', 'logo.png'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', event => event.preventDefault());
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'Archivo', submenu: [
+        { label: 'Elegir instalación de L4D2…', accelerator: 'Control+O', click: async () => {
+          const result = await dialog.showOpenDialog(window, { title: 'Carpeta de Left 4 Dead 2', properties: ['openDirectory'] });
+          if (!result.canceled) { try { manager.selectGame(result.filePaths[0]); window.webContents.reload(); } catch (error) { dialog.showErrorBox('Carpeta no válida', error.message); } }
+        } },
+        { label: 'Actualizar biblioteca', accelerator: 'Control+R', click: () => window.webContents.reload() },
+        { type: 'separator' }, { role: 'quit', label: 'Salir' }
+      ] },
+      { label: 'Herramientas', submenu: [
+        { label: 'Abrir copias de seguridad', click: async () => { require('node:fs').mkdirSync(manager.backups, { recursive: true }); await shell.openPath(manager.backups); } },
+        { label: 'Restaurar una copia…', accelerator: 'Control+Shift+B', click: async () => {
+          const result = await dialog.showOpenDialog(window, { title: 'Selecciona una copia de configuración', defaultPath: manager.backups, properties: ['openFile'], filters: [{ name: 'Copias de seguridad', extensions: ['bak'] }] });
+          if (result.canceled) return;
+          const id = path.basename(result.filePaths[0], '.bak');
+          const item = manager.listBackups().find(b => b.id === id);
+          if (!item) return dialog.showErrorBox('Copia no válida', 'Selecciona una copia de esta instalación.');
+          const choice = await dialog.showMessageBox(window, { type: 'question', buttons: ['Cancelar', 'Restaurar'], defaultId: 0, cancelId: 0, message: '¿Restaurar esta configuración?', detail: item.file + '\nSe respaldará la configuración actual. Cierra el juego y Steam antes de continuar.' });
+          if (choice.response === 1) { try { manager.restore({ id }); window.webContents.reload(); } catch (error) { dialog.showErrorBox('No se pudo restaurar', error.message); } }
+        } }
+      ] }
+    ]));
     window.loadFile(rendererFile);
     window.on('closed', () => { window = null; });
   }).catch(error => { dialog.showErrorBox('No se pudo iniciar', error.message); app.quit(); });
