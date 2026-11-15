@@ -8,6 +8,14 @@
 
 Aplicación de escritorio para Windows que administra mods y configuraciones de **Left 4 Dead 2**. Electron abre la interfaz incluida en el proyecto directamente. No utiliza servidor local, navegador externo, Express, Vite ni React.
 
+## Descargar para Windows
+
+**[Descargar L4D2 Mod Manager v1.1.0 portable (.exe)](https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.0/L4D2-Mod-Manager-1.1.0-x64.exe)**
+
+Windows de 64 bits · Abre el ejecutable directamente · No requiere Node.js.
+
+[Ver la versión y sus archivos en Releases](https://github.com/CodeByDante/manager-left-4-dead-2/releases/tag/v1.1.0) · [Comprobación SHA-256](https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.0/SHA256SUMS.txt)
+
 ![Vista general de la aplicación](docs/images/workshop.png)
 
 > Las imágenes muestran la interfaz real ejecutada con datos ilustrativos para explicar su uso. Los nombres, IDs, rutas y copias visibles son ejemplos; no son una prueba de compatibilidad de esos mods con el juego. La aplicación distribuida solo lista tus archivos reales.
