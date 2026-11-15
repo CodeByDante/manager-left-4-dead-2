@@ -2,7 +2,7 @@
   <img src="app/assets/app-icon.png" width="160" alt="Logo de L4D2 Mod Manager">
 </p>
 
-<h1 align="center">L4D2 Mod Manager</h1>
+<h3 align="center">L4D2 Mod Manager</h3>
 
 <p align="center">
   <a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.2/L4D2-Mod-Manager-1.1.2-x64.exe">
