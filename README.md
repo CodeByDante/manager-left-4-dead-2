@@ -1,6 +1,80 @@
-# L4D2 Mod Manager
+<p align="center">
+  <img src="app/assets/logo.png" width="130" alt="Logo de L4D2 Mod Manager">
+</p>
+
+<h1 align="center">L4D2 Mod Manager</h1>
+
+<p align="center"><strong>Tus mods y configuraciones de Left 4 Dead 2, en una aplicación de escritorio.</strong></p>
 
 Aplicación de escritorio para Windows que administra mods y configuraciones de **Left 4 Dead 2**. Electron abre la interfaz incluida en el proyecto directamente. No utiliza servidor local, navegador externo, Express, Vite ni React.
+
+![Vista general de la aplicación](docs/images/workshop.png)
+
+> Las imágenes muestran la interfaz real ejecutada con datos ilustrativos para explicar su uso. Los nombres, IDs, rutas y copias visibles son ejemplos; no son una prueba de compatibilidad de esos mods con el juego. La aplicación distribuida solo lista tus archivos reales.
+
+## Guía visual de uso
+
+### 1. Detectar la instalación
+
+Al abrir la aplicación se busca Steam en el registro de Windows y se consultan sus bibliotecas. A partir de la instalación encontrada se resuelven las rutas de Workshop, `gameinfo.txt` y los archivos de `cfg`. No necesitas seleccionar cada ruta por separado.
+
+Si usas otra instalación o no se detecta, pulsa **Elegir juego** y selecciona la carpeta raíz que contiene `left4dead2\gameinfo.txt`. La elección se conserva para las próximas sesiones. **Abrir carpeta** muestra esa ubicación en Windows.
+
+### 2. Revisar y preparar mods del Workshop
+
+![Workshop: búsqueda, estado y preparación](docs/images/workshop.png)
+
+1. Busca un mod por nombre o ID, o cambia el orden de la lista.
+2. Abre **Detalles** para leer la descripción y consultar los requisitos publicados en Steam.
+3. Usa **Activar / Desactivar** para cambiar el estado del VPK original.
+4. Pulsa **Preparar**, o selecciona varios y usa **Preparar seleccionados**.
+5. Confirma la operación. La aplicación crea una carpeta `Workshop_<ID>`, copia el VPK y agrega su ruta a `gameinfo.txt`, con copia de seguridad de la configuración.
+
+No mueve ni borra el VPK original del Workshop. Si un paquete está dividido en segmentos, verifica y copia los segmentos que necesita. Los resultados de operaciones por lotes indican cuántos mods se prepararon y qué errores ocurrieron.
+
+### 3. Administrar los mods preparados
+
+![Mods preparados y carpetas registradas](docs/images/prepared.png)
+
+Aquí aparecen los mods preparados desde Workshop. Puedes abrir su **Carpeta**, comprobar si existe y retirar uno o varios registros.
+
+Al usar **Retirar mod** en una carpeta creada por esta versión, se envía a la Papelera de Windows y se quita su registro de `gameinfo.txt`. Las carpetas de versiones antiguas que no se identifican como creadas por esta versión se conservan al quitar el registro.
+
+### 4. Revisar tus mods personalizados
+
+![Mods personalizados registrados manualmente](docs/images/custom.png)
+
+Esta sección conserva la función original: **lee las carpetas que la persona movió y registró manualmente en `SearchPaths` de `gameinfo.txt`**. No importa ni inventa mods.
+
+- **Carpeta encontrada / No encontrada:** indica si se localizó el directorio de esa ruta dentro de la instalación.
+- **Carpeta:** abre la ubicación detectada.
+- **Quitar registro:** elimina la entrada de `gameinfo.txt` y conserva los archivos que moviste manualmente.
+- **Retirar seleccionados:** permite quitar varios registros con confirmación previa; las carpetas manuales se conservan.
+
+### 5. Editar configuraciones y parámetros de inicio
+
+![Editor de gameinfo.txt y archivos de configuración](docs/images/config.png)
+
+En **Configuraciones**, elige el archivo, edítalo y pulsa **Guardar cambios**:
+
+| Pestaña | Para qué sirve |
+| --- | --- |
+| `gameinfo.txt` | Revisar y editar las rutas de búsqueda que carga el juego |
+| `autoexec.cfg` | Guardar tus comandos y ajustes personales de inicio |
+| `addonconfig.cfg` | Editar la configuración de addons que utiliza el juego |
+| **Inicio de Steam** | Elegir la cuenta y editar los parámetros de lanzamiento de L4D2 |
+
+Los cambios a `gameinfo.txt` se validan antes de guardar. Cada archivo existente se respalda antes de reemplazarlo. Los borradores se conservan al cambiar de sección durante la sesión.
+
+Para los parámetros de lanzamiento se usa el bloque de la aplicación **550 (L4D2)** de la cuenta seleccionada; los bloques de otros juegos se conservan. Cierra el juego antes de modificar su configuración y cierra Steam antes de guardar sus parámetros.
+
+### 6. Recuperar una configuración anterior
+
+![Copias de seguridad y restauración de archivos](docs/images/backups.png)
+
+En **Copias de seguridad**, elige la fecha y el archivo y pulsa **Restaurar**. La aplicación respalda primero la versión actual. También puedes abrir la carpeta donde se guardan las copias.
+
+Restaurar una configuración no recupera por sí solo una carpeta de mod retirada: si corresponde, restaura también esa carpeta desde la Papelera de Windows.
 
 ## Qué hace
 

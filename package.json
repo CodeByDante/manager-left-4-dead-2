@@ -20,9 +20,20 @@
   "build": {
     "appId": "com.l4d2.modmanager",
     "productName": "L4D2 Mod Manager",
-    "directories": { "output": "release" },
-    "files": ["app/**/*", "package.json"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
     "asar": true,
-    "win": { "target": ["portable"], "artifactName": "L4D2-Mod-Manager-${version}-${arch}.${ext}" }
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "L4D2-Mod-Manager-${version}-${arch}.${ext}",
+      "icon": "app/assets/icon.ico"
+    }
   }
 }
