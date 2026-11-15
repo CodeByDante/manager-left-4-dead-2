@@ -17,7 +17,7 @@
 
 ## Tu interfaz original
 
-Se conserva el diseño del proyecto original: fondo oscuro, pestañas superiores **Workshop Mods**, **Versus VPK**, **Autoexec** y **AddonConfig**, portadas grandes, tabla, etiquetas y botones de iconos. El icono oscuro identifica la aplicación en Windows; tu logo original aparece pequeño junto al nombre. Los editores utilizan una selección gris discreta.
+Se conserva el diseño del proyecto original: fondo oscuro, pestañas superiores **Workshop Mods**, **Versus VPK**, **Autoexec** y **AddonConfig**, portadas grandes, tabla, etiquetas y botones de iconos. El nuevo icono oscuro de código `</>` identifica la aplicación en Windows; tu logo original aparece pequeño junto al nombre. Los editores utilizan una selección gris discreta.
 
 ![Workshop Mods con el diseño original](docs/images/workshop.png)
 
