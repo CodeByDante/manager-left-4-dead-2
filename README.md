@@ -9,3 +9,5 @@
     <img src="docs/images/download-windows.svg" width="280" alt="DESCARGAR L4D2 MOD MANAGER">
   </a>
 </p>
+
+**L4D2 Mod Manager** es una herramienta para organizar y configurar tus mods de Left 4 Dead 2. Administra archivos del Workshop, prepara mods para Versus y edita configuraciones del juego desde una sola aplicación, con copias de seguridad automáticas.
