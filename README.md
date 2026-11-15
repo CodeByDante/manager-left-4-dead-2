@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.1/L4D2-Mod-Manager-1.1.1-x64.exe">
-    <img src="docs/images/download-windows.svg" width="440" alt="DESCARGAR L4D2 MOD MANAGER">
+    <img src="docs/images/download-windows.svg" width="280" alt="DESCARGAR L4D2 MOD MANAGER">
   </a>
 </p>
 
