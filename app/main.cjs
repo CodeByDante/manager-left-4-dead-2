@@ -76,7 +76,7 @@ else {
       if (url.protocol !== 'https:' || url.hostname !== 'steamcommunity.com') throw new Error('Solo se permiten enlaces HTTPS de Steam Workshop.');
       await shell.openExternal(url.href);
     });
-    window = new BrowserWindow({ width: 1320, height: 880, minWidth: 960, minHeight: 640, backgroundColor: '#0b0d12', autoHideMenuBar: true, title: 'L4D2 Mod Manager', icon: path.join(__dirname, 'assets', 'logo.png'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
+    window = new BrowserWindow({ width: 1320, height: 880, minWidth: 960, minHeight: 640, backgroundColor: '#0b0d12', autoHideMenuBar: true, title: 'L4D2 Mod Manager', icon: path.join(__dirname, 'assets', 'app-icon.png'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', event => event.preventDefault());
     Menu.setApplicationMenu(Menu.buildFromTemplate([

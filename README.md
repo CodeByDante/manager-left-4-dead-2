@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/assets/logo.png" width="220" alt="Logo de L4D2 Mod Manager">
+  <img src="app/assets/app-icon.png" width="160" alt="Logo de L4D2 Mod Manager">
 </p>
 
 <h1 align="center">L4D2 Mod Manager</h1>
@@ -7,7 +7,7 @@
 <p align="center">Administra tus mods y configuraciones de Left 4 Dead 2 desde una aplicación de PC.</p>
 
 <p align="center">
-  <a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.1/L4D2-Mod-Manager-1.1.1-x64.exe">
+  <a href="https://github.com/CodeByDante/manager-left-4-dead-2/releases/download/v1.1.2/L4D2-Mod-Manager-1.1.2-x64.exe">
     <img src="docs/images/download-windows.svg" width="280" alt="DESCARGAR L4D2 MOD MANAGER">
   </a>
 </p>
@@ -17,7 +17,7 @@
 
 ## Tu interfaz original
 
-Se conserva el diseño del proyecto original: fondo oscuro, pestañas superiores **Workshop Mods**, **Versus VPK**, **Autoexec** y **AddonConfig**, portadas grandes, tabla, etiquetas y botones de iconos. El logo propio se utiliza en el icono de la aplicación y en esta documentación.
+Se conserva el diseño del proyecto original: fondo oscuro, pestañas superiores **Workshop Mods**, **Versus VPK**, **Autoexec** y **AddonConfig**, portadas grandes, tabla, etiquetas y botones de iconos. El icono oscuro identifica la aplicación en Windows; tu logo original aparece pequeño junto al nombre. Los editores utilizan una selección gris discreta.
 
 ![Workshop Mods con el diseño original](docs/images/workshop.png)
 
@@ -137,7 +137,7 @@ También puedes abrir `abrir_app_escritorio.bat` desde la carpeta del proyecto.
 npm run build
 ```
 
-El resultado queda en `release\L4D2-Mod-Manager-1.1.1-x64.exe`.
+El resultado queda en `release\L4D2-Mod-Manager-1.1.2-x64.exe`.
 
 El flujo **Windows desktop** de GitHub Actions instala las dependencias, verifica el código, ejecuta las pruebas y construye el ejecutable en Windows. Las versiones publicadas se encuentran en [Releases](https://github.com/CodeByDante/manager-left-4-dead-2/releases).
 

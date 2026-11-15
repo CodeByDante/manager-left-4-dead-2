@@ -125,8 +125,8 @@
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
     }
     .code-editor-wrapper:focus-within {
-      border-color: #3b82f6 !important;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+      border-color: #373746 !important;
+      box-shadow: none !important;
     }
     .code-editor-highlight,
     .code-editor-textarea {
@@ -157,14 +157,14 @@
       z-index: 2;
       background: transparent !important;
       color: transparent !important;
-      caret-color: #38bdf8 !important;
+      caret-color: #e4e4e7 !important;
       resize: none;
       outline: none;
       border: none !important;
       overflow: auto;
     }
     .code-editor-textarea::selection {
-      background: #264f78 !important;
+      background: #292933 !important;
       color: #ffffff !important;
     }
 
@@ -587,3 +587,5 @@
       position: absolute;
       top: 1px;
     }
+
+.brand-logo { width:22px; height:22px; object-fit:contain; border-radius:3px; margin-right:4px; flex-shrink:0; }
